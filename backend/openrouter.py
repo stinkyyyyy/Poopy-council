@@ -53,6 +53,55 @@ async def query_model(
         return None
 
 
+async def query_base_model_parallel(
+    base_model: str,
+    messages: List[Dict[str, str]],
+    count: int
+) -> List[Optional[Dict[str, Any]]]:
+    """
+    Query the base model multiple times in parallel with the same messages.
+    Args:
+        base_model: The OpenRouter model identifier to use for all queries.
+        messages: The messages to send to the model.
+        count: The number of times to query the model.
+    Returns:
+        A list of responses.
+    """
+    import asyncio
+
+    tasks = [query_model(base_model, messages) for _ in range(count)]
+    return await asyncio.gather(*tasks)
+
+
+async def query_personas_parallel(
+    base_model: str,
+    user_query: str,
+    personas: List[Dict[str, str]]
+) -> Dict[str, Optional[Dict[str, Any]]]:
+    """
+    Query a single model with multiple personas in parallel.
+    Args:
+        base_model: The OpenRouter model identifier to use for all queries.
+        user_query: The user's query.
+        personas: A list of persona dictionaries, each with "name" and "prompt".
+    Returns:
+        A dictionary mapping persona name to the response.
+    """
+    import asyncio
+
+    tasks = []
+    for p in personas:
+        messages = [
+            {"role": "system", "content": p["prompt"]},
+            {"role": "user", "content": user_query}
+        ]
+        tasks.append(query_model(base_model, messages))
+
+    responses = await asyncio.gather(*tasks)
+
+    return {persona["name"]: response for persona, response in zip(personas, responses)}
+
+
 async def query_models_parallel(
     models: List[str],
     messages: List[Dict[str, str]]

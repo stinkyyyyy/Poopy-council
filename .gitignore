@@ -1,21 +1,25 @@
-# Python-generated files
+# Logs
+*.log
+
+# Virtual environment
+.venv/
+
+# Python cache
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+*.py[cod]
+*$py.class
 
-# Virtual environments
-.venv
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+# Keep package-lock.json if you want to lock dependencies
+# add "package-lock.json" to the line above if you want to ignore it.
 
-# Keys and secrets
-.env
-
-# Data files
-data/
-
-# Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*~

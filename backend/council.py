@@ -1,13 +1,14 @@
 """3-stage LLM Council orchestration."""
 
 from typing import List, Dict, Any, Tuple
-from .openrouter import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+import json
+from .openrouter import query_model, query_personas_parallel, query_base_model_parallel
+from .config import CHAIRMAN_MODEL, BASE_MODEL
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     """
-    Stage 1: Collect individual responses from all council models.
+    Stage 1: Collect individual responses from all council personas.
 
     Args:
         user_query: The user's question
@@ -15,17 +16,19 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     Returns:
         List of dicts with 'model' and 'response' keys
     """
-    messages = [{"role": "user", "content": user_query}]
+    # Load personas from the JSON file
+    with open("data/personas.json", "r") as f:
+        personas = json.load(f)
 
-    # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    # Query all personas in parallel
+    responses = await query_personas_parallel(BASE_MODEL, user_query, personas)
 
     # Format results
     stage1_results = []
-    for model, response in responses.items():
+    for persona_name, response in responses.items():
         if response is not None:  # Only include successful responses
             stage1_results.append({
-                "model": model,
+                "model": persona_name,  # Use persona name instead of model ID
                 "response": response.get('content', '')
             })
 
@@ -94,17 +97,21 @@ Now provide your evaluation and ranking:"""
 
     messages = [{"role": "user", "content": ranking_prompt}]
 
-    # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    # Load personas from the JSON file
+    with open("data/personas.json", "r") as f:
+        personas = json.load(f)
+
+    # Get rankings from all council personas in parallel
+    responses_list = await query_base_model_parallel(BASE_MODEL, messages, len(personas))
 
     # Format results
     stage2_results = []
-    for model, response in responses.items():
+    for i, response in enumerate(responses_list):
         if response is not None:
             full_text = response.get('content', '')
             parsed = parse_ranking_from_text(full_text)
             stage2_results.append({
-                "model": model,
+                "model": personas[i]["name"],
                 "ranking": full_text,
                 "parsed_ranking": parsed
             })

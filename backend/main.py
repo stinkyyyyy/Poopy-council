@@ -8,16 +8,18 @@ from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+import httpx
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .config import BASE_MODEL
 
 app = FastAPI(title="LLM Council API")
 
 # Enable CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,10 +52,73 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
+class UpdateSettingsRequest(BaseModel):
+    """Request to update the settings."""
+    personas: List[Dict[str, Any]]
+
+
+class FetchSettingsRequest(BaseModel):
+    """Request to fetch settings from a URL."""
+    url: str
+
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Get the current base model and personas."""
+    try:
+        with open("data/personas.json", "r") as f:
+            personas = json.load(f)
+        return {"base_model": BASE_MODEL, "personas": personas}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Personas file not found.")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Error reading personas file.")
+
+
+@app.post("/api/settings")
+async def update_settings(request: UpdateSettingsRequest):
+    """Update the personas."""
+    try:
+        with open("data/personas.json", "w") as f:
+            json.dump(request.personas, f, indent=4)
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error writing personas file: {e}")
+
+
+@app.post("/api/settings/fetch")
+async def fetch_settings(request: FetchSettingsRequest):
+    """Fetch personas from a URL and replace the current ones."""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(request.url)
+            response.raise_for_status()
+            new_personas = response.json()
+
+        # Basic validation
+        if not isinstance(new_personas, list) or not all(
+            isinstance(p, dict) and "name" in p and "prompt" in p for p in new_personas
+        ):
+            raise HTTPException(status_code=400, detail="Invalid persona format.")
+
+        with open("data/personas.json", "w") as f:
+            json.dump(new_personas, f, indent=4)
+
+        return {"status": "ok", "personas": new_personas}
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=e.response.status_code, detail=f"Failed to fetch from URL: {e}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"An error occurred: {e}"
+        )
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])

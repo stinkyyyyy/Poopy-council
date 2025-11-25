@@ -2,7 +2,7 @@
  * API client for the LLM Council backend.
  */
 
-const API_BASE = 'http://localhost:8001';
+const API_BASE = `http://${window.location.hostname}:8001`;
 
 export const api = {
   /**
@@ -111,5 +111,50 @@ export const api = {
         }
       }
     }
+  },
+
+  /**
+   * Get settings.
+   */
+  async getSettings() {
+    const response = await fetch(`${API_BASE}/api/settings`);
+    if (!response.ok) {
+      throw new Error('Failed to get settings');
+    }
+    return response.json();
+  },
+
+  /**
+   * Update settings.
+   */
+  async updateSettings(settings) {
+    const response = await fetch(`${API_BASE}/api/settings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update settings');
+    }
+    return response.json();
+  },
+
+  /**
+   * Fetch settings from a URL.
+   */
+  async fetchSettings(url) {
+    const response = await fetch(`${API_BASE}/api/settings/fetch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
+    return response.json();
   },
 };
